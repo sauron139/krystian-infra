@@ -1,0 +1,86 @@
+# Local development stack. Run from this folder: `make up`.
+# Expects sibling repos: ../krystian-backend, ../krystian-frontend, ../krystian-admin
+name: krystian
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports: ["5432:5432"] # exposed in dev only, for DB GUIs / psql
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7.4-alpine
+    ports: ["6379:6379"]
+    volumes: [redis-data:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Catches every email the backend sends; view them at http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:v1.33
+    ports: ["1025:1025", "8025:8025"]
+
+  backend:
+    build:
+      context: ../krystian-backend
+      target: dev
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379/0
+      CORS_ORIGINS: '["http://localhost:4321","http://localhost:5173"]'
+    ports: ["8000:8000"]
+    volumes:
+      - ../krystian-backend:/app # hot reload; the venv lives at /opt/venv so it isn't shadowed
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ../krystian-frontend
+      target: dev
+    environment:
+      API_URL: http://backend:8000 # server-side fetches go over the Docker network
+      PUBLIC_SITE_URL: http://localhost:4321
+    ports: ["4321:4321"]
+    volumes:
+      - ../krystian-frontend:/app
+      - /app/node_modules # keep the container's Linux node_modules, not the host's
+    depends_on:
+      backend: { condition: service_healthy }
+
+  admin:
+    build:
+      context: ../krystian-admin
+      target: dev
+    environment:
+      VITE_API_URL: http://localhost:8000 # used by the browser, so it's the host-facing URL
+    ports: ["5173:5173"]
+    volumes:
+      - ../krystian-admin:/app
+      - /app/node_modules
+    depends_on:
+      backend: { condition: service_healthy }
+
+volumes:
+  postgres-data:
+  redis-data:
