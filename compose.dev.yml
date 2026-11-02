@@ -41,18 +41,28 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379/0
       CORS_ORIGINS: '["http://localhost:4321","http://localhost:5173"]'
+      SECRET_KEY: ${SECRET_KEY}
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      NOTIFY_EMAIL: ${NOTIFY_EMAIL}
+      DEV_ADMIN_EMAIL: ${ADMIN_EMAIL}
+      DEV_ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      # `make test-backend` uses a separate database and Redis DB
+      TEST_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/krystian_test
+      TEST_REDIS_URL: redis://redis:6379/15
     ports: ["8000:8000"]
     volumes:
       - ../krystian-backend:/app # hot reload; the venv lives at /opt/venv so it isn't shadowed
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
+      mailpit: { condition: service_started }
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/health')"]
       interval: 10s
       timeout: 3s
       retries: 10
-      start_period: 10s
+      start_period: 30s # migrations + seed run first
 
   frontend:
     build:

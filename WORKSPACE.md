@@ -32,7 +32,7 @@ too when working inside any repo, so system-wide rules live here.
 Keep docs current. When a decision changes, update the doc in the same change.
 
 ## Status
-- Phase: **1 — Foundations** (repos scaffolded; local stack via `make up` in krystian-infra)
+- Phase: **2 — Backend core** done on branch `milestone-2-backend-core` (models, migrations, seed, public + admin API, auth, contact). Next: Milestone 3, frontend skeleton.
 - `PROPOSED` = suggested, not yet confirmed by Krystian. `CONFIRMED` = agreed.
 - `TODO(krystian)` = needs Krystian's input.
 

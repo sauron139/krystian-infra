@@ -56,38 +56,63 @@ Telemetry details: small mono labels like `RA 14h 29m · §02 OBSERVATIONS` or
 - Content max width ~72ch (text), ~1200px (grids). 8px spacing scale.
 - Mobile first. Breakpoints 640 / 768 / 1024 / 1280.
 - A fixed, low-cost starfield sits behind everything; content sits on surfaces above it.
-- Nav: compact top bar; on scroll it becomes a translucent "HUD" bar.
+- Nav: no menu bar. Home is the planetary system (planets are the menu); inside a scene, the brand star
+  (top-left) goes home and a small orrery (bottom-right) reaches the other planets. See §5.
 
-## 5. Physics system — CONFIRMED direction (preview v2)
-Every section runs one real phenomenon, and navigation itself is physics.
+## 5. Physics system — CONFIRMED direction (preview v3)
+The site is a planetary system. Navigation is orbital mechanics, and each page (scene) runs one real phenomenon.
 Live preview: https://claude.ai/artifact/MZWMs7ci2MBM2wUpg73zfe
 
-| Where | Phenomenon | Real physics used |
+### Navigation: orbital system (CONFIRMED)
+- **Home = the star system.** Full-screen view of a star with six planets on circular Kepler orbits
+  (μ = 4π² AU³/yr², n = 2π/a^1.5, 1 simulated year = 16 s). The visitor ("You") sits in a parking orbit at 0.55 AU.
+  Short intro copy + two CTAs on the left. No text menu bar.
+- **Each page is a planet:** Projects 1.0 AU (banded gas giant), Services 1.45 (cyan storm world),
+  Skills 1.9 (ringed), About 2.35 (ocean world), Experience 2.8 (rust, cratered), Contact 3.25 (ice).
+  Planets are lit from the star (terminator follows the light direction).
+- **Clicking a planet** solves Lambert's problem (universal variables, Curtis Alg. 5.2) from the ship's
+  current body to where the target *will be*. Several flight times (0.5–2.1 × Hohmann) are tried; routes
+  passing within 0.3 AU of the star are rejected; the lowest-Δv one wins (a tiny porkchop plot).
+  The path is integrated with leapfrog and drawn as the ship flies.
+- **Timing ("watch it, quick"):** flight ≈ 0.95 s with time warp, then ≈ 0.5 s zoom anchored on the planet
+  until its horizon fills the bottom of the screen and the scene fades in. Scene → scene: zoom out 0.38 s,
+  fly, zoom in. Any click or key skips. Reduced motion: instant cut.
+- **Only readout:** one fading caption during flight, e.g. "Lambert transfer to Skills · Δv 10.0 km/s · 1.30 yr".
+- **In a scene:** brand star (top-left) returns home; a small orrery (bottom-right) is the menu for other
+  planets. Esc returns home.
+- **Separate scenes, real URLs.** One scene at a time, each with its own URL (preview uses `#projects` etc.;
+  Astro will use real routes `/projects` …). Back/forward work. Focus moves to the scene heading.
+  Planet and orrery hit targets are real `<button>`/`<a>` elements over the canvas, so keyboard and
+  screen readers work and nothing lives only in a canvas.
+
+### Scenes
+| Scene | Phenomenon | Real physics used |
 |-------|------------|-------------------|
-| **Navigation** | **Projectile launch.** Each section is a beacon at a different range on a "launch console". Clicking a link auto-aims and fires a probe; landing within 30 m of a beacon arrives at that section. Users can also aim by dragging (slingshot). | Range equation R = v₀² sin 2θ / g; optional quadratic drag a = −k\|v\|v integrated with RK4, auto-aim by bisection on v₀; apex kept on screen via tan θ ≤ 4H/R; time warp shown |
-| Origin (hero) | Gravity well; the cursor is a second mass | Newtonian gravity, Plummer softening, kick-drift-kick leapfrog (symplectic) |
-| Observations | Kepler orbits on project cards; bubble-chamber tracks in the background | Kepler's equation (Newton solve); Lorentz force in uniform B with energy loss → spirals; pair production vertices |
-| Placeholder cards | "Unresolved object" jitters | Brownian motion (Ornstein–Uhlenbeck in a harmonic trap) |
-| Services | Each service is a bulb on one battery; switches toggle them | Ohm's law, parallel resistors, internal resistance (remaining bulbs brighten when others switch off), P = I²R |
-| Star catalogue | Skills on an HR-style chart, spectral classes by category | Blackbody colour by temperature; Wien's law λ_max = b/T |
-| Mission profile | White light through a steerable prism | Snell's law (vector form) at each face, Cauchy dispersion (dense flint), total internal reflection handled |
-| Trajectory | Rocket passes career stages as you scroll; Δv accumulates toward orbit | Tsiolkovsky Δv = I_sp g₀ ln(m₀/m_f); ~9.4 km/s LEO budget |
-| Contact | Two-source interference (cursor moves one source); sending pings the wall and times the echo | Superposition I ∝ (cos(kr₁−ωt)+cos(kr₂−ωt))²; reflection via image source; d = vt/2 |
-| HUD readout | Scroll speed shown as β and γ; headings contract vertically | Special relativity: γ = 1/√(1−β²), length contraction L/γ (c scaled to 3000 px/s) |
-| 404 (planned) | Page falls past an event horizon; a ball occasionally tunnels through a barrier | Schwarzschild radius visual; tunnelling probability T ≈ e^(−2κL) |
+| Projects | Kepler orbit on each card (runs on hover/focus); placeholder card jitters | Kepler's equation (Newton solve); Brownian motion (Ornstein–Uhlenbeck in a harmonic trap) |
+| Services | Each service is a bulb on one battery; switches toggle them; watts per card | Ohm's law, parallel resistors, internal resistance, P = I²R |
+| Skills | HR-style chart, spectral class per category | Blackbody colour by temperature; Wien's law λ_max = b/T |
+| About | White light through a steerable prism | Snell's law (vector form), Cauchy dispersion (dense flint), total internal reflection |
+| Experience | Rocket passes career stages as the scene scrolls; Δv toward orbit | Tsiolkovsky Δv = I_sp g₀ ln(m₀/m_f); ~9.4 km/s LEO budget |
+| Contact | Two-source interference (cursor moves one source); sending times an echo | Superposition; reflection via image source; d = vt/2 |
+| 404 (planned) | A planet that isn't there: event horizon | Schwarzschild radius visual |
+
+Removed after v2 feedback (felt like a "regular dev page"): text menu bar, launch console,
+stacked long-scroll sections, extra readouts (β/γ HUD, formula strips), gravity-particle hero, bubble chamber.
 
 Rules:
-- Every link still works as a normal link: modifier-click, keyboard, and `prefers-reduced-motion` skip the launch and jump directly.
-- At most one heavy simulation runs at a time; each module ticks only while on screen.
+- Every route is a normal link: direct loads, modifier-click and no-JS all work; the flight is an enhancement.
+- Only the active scene's simulation ticks; the system view pauses while a scene is open except the orrery.
 - Example numbers (stage Isp, circuit values) are labelled as such; the equations are real.
-- Physics code lives in `src/physics/` and is unit tested (energy conservation, range accuracy, Snell/TIR cases).
+- Physics code lives in `src/physics/` and is unit tested (Lambert round-trip vs propagation, energy
+  conservation, Snell/TIR cases).
 
-Ideas held in reserve: resonance (driven oscillator) on button hover, magnetic field lines around the cursor, thermodynamics/entropy for a "loading" state, Doppler shift on fast navigation.
+Ideas held in reserve: Doppler tint on fast flights, gravity assists for long routes, resonance on button hover.
 
 ## 6. Motion
 - Durations: 150ms micro, 300ms UI, 600ms+ scenes.
 - Prefer spring/damped motion over fixed easing curves.
-- `prefers-reduced-motion: reduce` → static starfield, no hero sim (show a still frame), fades only.
+- Transfers: ≈1–1.5 s total, skippable by any click or key.
+- `prefers-reduced-motion: reduce` → static starfield, planets frozen, no flights (instant cut to the scene), fades only.
 - Simulations pause when off-screen or the tab is hidden.
 
 ## 7. Placeholder states (content not yet provided)

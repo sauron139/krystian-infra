@@ -1,7 +1,7 @@
 # Shortcuts for the local stack. Run `make help` to list them.
 COMPOSE := docker compose -f compose.dev.yml
 
-.PHONY: help setup up down logs ps build rebuild reset test-backend sh-backend psql
+.PHONY: help setup up down logs ps build rebuild reset test-backend sh-backend psql migrate migration seed openapi
 
 help: ## List commands
 	@grep -E '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -35,6 +35,18 @@ reset: ## DANGER: stop everything and delete all local data
 
 test-backend: ## Run backend tests inside the container
 	$(COMPOSE) exec backend pytest -q
+
+migrate: ## Apply database migrations
+	$(COMPOSE) exec backend alembic upgrade head
+
+migration: ## Create a migration from model changes (e.g. make migration m="add foo")
+	$(COMPOSE) exec backend alembic revision --autogenerate -m "$(m)"
+
+seed: ## Insert placeholder content where missing
+	$(COMPOSE) exec backend python -m app.cli seed
+
+openapi: ## Export the API spec to ../krystian-backend/openapi.json
+	$(COMPOSE) exec backend python -m app.cli export-openapi openapi.json
 
 sh-backend: ## Shell into the backend container
 	$(COMPOSE) exec backend sh
