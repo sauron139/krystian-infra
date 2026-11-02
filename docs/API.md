@@ -1,4 +1,4 @@
-# API Contract — PROPOSED
+# API Contract — IMPLEMENTED (Milestone 2; media endpoints arrive in Milestone 4)
 
 The backend (`krystian-backend`) owns this contract. The live, authoritative spec is the
 OpenAPI document at `GET /openapi.json`; this file is the human-readable plan.
@@ -10,6 +10,8 @@ Base URL: `https://api.krystian.dev/v1` (local: `http://localhost:8000/v1`)
 - JSON everywhere; `snake_case` fields; ISO 8601 dates (UTC).
 - Lists: `?page=1&page_size=20` → `{ items: [...], total, page, page_size }`.
 - Errors: `{ "error": { "code": "not_found", "message": "...", "details": {...} } }`.
+  Codes: `validation_error` (422, `details.fields[]`), `unauthorized`, `not_found`, `conflict`,
+  `rate_limited` (429 + `Retry-After`), `invalid_reference`, `captcha_failed`.
 - Public endpoints return only `status = published` items.
 - Cache: public GETs cached in Redis; any admin write invalidates related keys.
 - Every content item includes `is_placeholder: boolean` so clients can style placeholder content.
@@ -21,27 +23,29 @@ Base URL: `https://api.krystian.dev/v1` (local: `http://localhost:8000/v1`)
 | GET | `/profile` | Profile |
 | GET | `/projects?category=&tag=&featured=` | Paginated projects (cards) |
 | GET | `/projects/{slug}` | Project with Markdown body |
-| GET | `/services` | Services (ordered) |
-| GET | `/experience` | Experience entries (newest first) |
-| GET | `/skills` | Skills (for HR diagram + list) |
+| GET | `/services` | Services (ordered, not paginated) |
+| GET | `/experience` | Experience entries (newest first, not paginated) |
+| GET | `/skills` | Skills (for HR diagram + list, not paginated) |
 | GET | `/posts`, `/posts/{slug}` | Blog posts |
 | GET | `/site-settings` | SEO defaults, feature toggles |
-| POST | `/contact` | Create a ContactMessage (rate-limited, Turnstile token required) |
+| POST | `/contact` | Create a ContactMessage → 202. Rate-limited (5/hour/IP); honeypot field `website`; Turnstile token required once `TURNSTILE_SECRET` is set |
 
 ## Admin endpoints (auth required)
 | Method | Path | Purpose |
 |--------|------|---------|
-| POST | `/admin/auth/login` | Email + password (+ TOTP later) → access token, sets refresh cookie |
-| POST | `/admin/auth/refresh` | Rotate tokens |
+| POST | `/admin/auth/login` | Email + password (+ TOTP later) → `{access_token, expires_in}`; sets `krystian_refresh` cookie (HttpOnly, SameSite=Strict, Path=/v1/admin/auth). Rate-limited 10/15 min/IP |
+| POST | `/admin/auth/refresh` | Rotate tokens (reuse of an old token revokes the whole session family) |
+| GET | `/admin/auth/me` | Current admin |
 | POST | `/admin/auth/logout` | Revoke refresh token |
 | GET/PUT | `/admin/profile` | Read / update profile |
 | GET/POST | `/admin/projects` | List (all statuses) / create |
-| GET/PATCH/DELETE | `/admin/projects/{id}` | Read / update / delete |
+| GET/PATCH/DELETE | `/admin/projects/{id}` | Read / update / delete. Any edit clears `is_placeholder` |
 | POST | `/admin/projects/reorder` | `{ ids: [...] }` |
 | — | same pattern for `services`, `experience`, `skills`, `posts` | |
-| POST | `/admin/media/upload-url` | Presigned upload URL |
-| GET/PATCH/DELETE | `/admin/media`, `/admin/media/{id}` | Manage media |
-| GET | `/admin/messages?status=` | Lead inbox |
+| POST | `/admin/media/upload-url` | Presigned upload URL (Milestone 4) |
+| GET/PATCH/DELETE | `/admin/media`, `/admin/media/{id}` | Manage media (Milestone 4) |
+| GET | `/admin/messages?status=` | Lead inbox (newest first) |
+| GET | `/admin/messages/{id}` | One message |
 | PATCH | `/admin/messages/{id}` | Change status (new / replied / archived) |
 | GET/PUT | `/admin/site-settings` | SEO and toggles |
 | GET | `/admin/content-checklist` | Which content is still placeholder |
@@ -49,10 +53,10 @@ Base URL: `https://api.krystian.dev/v1` (local: `http://localhost:8000/v1`)
 ## Resources (fields)
 **Profile**: `full_name, headline, short_bio, long_bio (md), photo (Media?), cv (Media?),
 location, email, socials { github, linkedin, x, website }, availability (open_to_work |
-open_to_freelance | busy), is_placeholder`
+open_to_freelance | open_to_both | unavailable), is_placeholder`
 
 **Project**: `id, slug, title, summary, body (md), category (software | physics | freelance |
-research), tags[], tech_stack[], cover (Media?), gallery (Media[]), links { repo, demo,
+research), tags[], tech_stack[], cover (Media?), gallery (Media[], Milestone 4), links { repo, demo,
 paper }, featured, sort_order, status, published_at, is_placeholder`
 
 **Service**: `id, title, summary, description (md), deliverables[], pricing_note,
@@ -61,7 +65,7 @@ sort_order, status, is_placeholder`
 **Experience**: `id, type (work | education | research | volunteer), organization, role,
 location, start_date, end_date?, bullets[], sort_order, status, is_placeholder`
 
-**Skill**: `id, name, category (language | framework | physics | math | tool | cloud),
+**Skill**: `id, name, category (language | framework | data | physics | math | tool | cloud),
 years (number), proficiency (1–5), featured, is_placeholder`
 
 **Post**: `id, slug, title, summary, body (md), tags[], cover?, status, published_at`
@@ -70,5 +74,6 @@ years (number), proficiency (1–5), featured, is_placeholder`
 
 **ContactMessage**: `id, name, email, intent (job | freelance | other), company?,
 budget_range?, message, status (new | replied | archived), created_at`
+(input also accepts `website` (honeypot, must be empty) and `turnstile_token`)
 
 **SiteSettings**: `seo_title, seo_description, og_image (Media?), show_blog, show_cv_button`

@@ -48,7 +48,7 @@ Polyrepo: four independent git repos inside this workspace. Each builds its own 
 | Validation | Pydantic v2 + pydantic-settings | Schemas and typed config from env |
 | ORM / migrations | **SQLAlchemy 2.0 (async)** + asyncpg, **Alembic** | Mature, typed, explicit migrations |
 | Database | **PostgreSQL 17** | Reliable, JSONB for flexible fields, full-text search later |
-| Cache / rate limit / jobs | **Redis 7**; **arq** for background jobs | Cache public reads, throttle contact form, send emails off the request path |
+| Cache / rate limit / jobs | **Redis 7**; FastAPI `BackgroundTasks` for email | Cache public reads (version-counter invalidation), throttle login + contact form. A job queue is deferred until something needs retries/scheduling |
 | Auth | Single admin user; argon2 password hashing; short-lived JWT access token + refresh token in httpOnly cookie; TOTP 2FA later | Simple and secure for one user |
 | File storage | S3 API (**Cloudflare R2** in prod; local S3 stand-in TBD in Milestone 4) | Same code both places; R2 has no egress fees |
 | Email | **Resend** (or any SMTP) | New-lead notifications |
@@ -95,7 +95,7 @@ Served as static files by Caddy. Never indexed (`noindex`, robots disallow).
 | Containers | **Docker**, multi-stage builds (Dockerfiles live in each app repo) | |
 | Orchestration | **Docker Compose**: `compose.dev.yml` and `compose.prod.yml` | Right size for one server |
 | Reverse proxy | **Caddy** | Automatic HTTPS, simple config |
-| Services | Postgres, Redis, Mailpit (dev only), backend, frontend, admin, arq worker; local S3 stand-in added in M4 | |
+| Services | Postgres, Redis, Mailpit (dev only), backend, frontend, admin; local S3 stand-in added in M4 | |
 | Hosting | One VPS (e.g. **Hetzner** CX22, ~€4–5/month) | Cheap, full control |
 | DNS / CDN | **Cloudflare** (DNS, proxy, R2, Turnstile) | |
 | CI/CD | **GitHub Actions** in each app repo: test → build image → push to **GHCR**; infra repo deploys via SSH (`docker compose pull && up -d`) | |
@@ -158,6 +158,9 @@ Every content entity has `status` (`draft` / `published`) and `is_placeholder` (
 | 9 | GitHub Actions → GHCR → SSH deploy | PROPOSED |
 | 10 | Defaults accepted: domain `krystian.dev`, personal GitHub, public repos, Hetzner | CONFIRMED |
 | 11 | Node 24 in containers; TypeScript 6 (Astro check not yet on TS 7) | CONFIRMED |
+| 12 | Emails via FastAPI BackgroundTasks, no job queue yet (leads are saved before any email is attempted) | CONFIRMED |
+| 13 | Enums stored as VARCHAR + CHECK, not native PG enums (easier migrations) | CONFIRMED |
+| 14 | Public cache invalidated by bumping a Redis version counter on every admin write | CONFIRMED |
 
 ## 7. Open questions
 | # | Question | Default if no answer |
